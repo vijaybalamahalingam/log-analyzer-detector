@@ -4,6 +4,12 @@ import time
 import altair as alt
 from utils import *
 from constants import *
+import sys
+import os
+
+# Add DB folder to path for importing insert functions
+sys.path.append(os.path.join(os.path.dirname(__file__), 'DB'))
+from insert import prepare_analysis_data_for_mongodb, insert_to_mongodb
 
 # Check if streamlit-aggrid is available
 try:
@@ -288,6 +294,110 @@ def upload_and_configure_tab(standard_range, time_window, use_time_grouping):
                         hash(uploaded_file.name + str(uploaded_file.size))
                     )
                     st.session_state["analyzed_file_hash"] = current_file_hash
+
+                    # Automatically insert analysis results to MongoDB
+                    try:
+                        with st.spinner("📊 Inserting analysis results to MongoDB..."):
+                            
+                            # Prepare file info
+                            file_info = {
+                                "file_name": uploaded_file.name,
+                                "file_size": uploaded_file.size,
+                                "file_hash": current_file_hash
+                            }
+                            
+                            # Prepare analysis config
+                            analysis_config = {
+                                "standard_range": standard_range,
+                                "time_window": time_window,
+                                "use_time_grouping": use_time_grouping,
+                                "max_workers": 5
+                            }
+                            
+                            # Prepare analysis status with safe timestamp handling
+                            analysis_start_time = st.session_state.get("analysis_start_time")
+                            if analysis_start_time:
+                                start_time_str = analysis_start_time.isoformat() if hasattr(analysis_start_time, 'isoformat') else str(analysis_start_time)
+                            else:
+                                start_time_str = pd.Timestamp.now().isoformat()
+                            
+                            analysis_status = {
+                                "status": "completed",
+                                "start_time": start_time_str,
+                                "end_time": pd.Timestamp.now().isoformat(),
+                                "progress_percentage": 100,
+                                "current_stage": "completed",
+                                "error_message": ""
+                            }
+                            
+                            # Calculate statistics
+                            anomalies = results_df["Anomaly"].sum() if "Anomaly" in results_df.columns else 0
+                            total_logs = len(results_df)
+                            normal_logs = total_logs - anomalies
+                            anomaly_rate = (anomalies / total_logs * 100) if total_logs > 0 else 0
+                            
+                            # Get timestamp statistics safely
+                            try:
+                                timestamp_stats = get_timestamp_statistics(results_df)
+                            except Exception as e:
+                                st.warning(f"⚠️ Could not get timestamp statistics: {str(e)}")
+                                timestamp_stats = {
+                                    "valid_timestamps": total_logs,
+                                    "invalid_timestamps": 0,
+                                    "success_rate": 100.0
+                                }
+                            
+                            # Calculate analysis duration safely
+                            if analysis_start_time:
+                                try:
+                                    analysis_duration = (pd.Timestamp.now() - analysis_start_time).total_seconds()
+                                except:
+                                    analysis_duration = 0
+                            else:
+                                analysis_duration = 0
+                            
+                            statistics = {
+                                "total_logs": total_logs,
+                                "valid_timestamps": timestamp_stats.get("valid_timestamps", total_logs),
+                                "invalid_timestamps": timestamp_stats.get("invalid_timestamps", 0),
+                                "timestamp_success_rate": timestamp_stats.get("success_rate", 100.0),
+                                "anomalies_detected": anomalies,
+                                "normal_logs": normal_logs,
+                                "anomaly_rate": anomaly_rate,
+                                "analysis_duration_seconds": analysis_duration,
+                                "time_groups_analyzed": len(st.session_state.get("hourly_groups", {}))
+                            }
+                            
+                            # Debug: Show what we're sending to MongoDB
+                            st.info(f"📊 Preparing MongoDB data: {total_logs} logs, {anomalies} anomalies")
+                            
+                            # Prepare data for MongoDB
+                            analysis_data = prepare_analysis_data_for_mongodb(
+                                results_df=results_df,
+                                file_info=file_info,
+                                analysis_config=analysis_config,
+                                analysis_status=analysis_status,
+                                statistics=statistics,
+                                time_groups=None,  # Don't pass time_groups as it's causing issues
+                                hourly_groups=st.session_state.get("hourly_groups", {})
+                            )
+                            
+                            # Insert to MongoDB
+                            mongodb_result = insert_to_mongodb(analysis_data)
+                            
+                            if mongodb_result["success"]:
+                                st.success(f"✅ Analysis results successfully saved to MongoDB!")
+                                st.info(f"📊 MongoDB Response: {mongodb_result['message']}")
+                            else:
+                                st.warning(f"⚠️ MongoDB insertion failed: {mongodb_result['message']}")
+                                st.error(f"Error details: {mongodb_result['response']}")
+                                
+                    except Exception as e:
+                        st.error(f"❌ Error inserting to MongoDB: {str(e)}")
+                        st.info("Analysis completed but MongoDB insertion failed. Results are still available in the app.")
+                        # Debug: Show the full error traceback
+                        import traceback
+                        st.error(f"Full error: {traceback.format_exc()}")
 
                 finally:
                     # Clear the in-progress flag
