@@ -142,27 +142,18 @@ The Log Analyzer application uses a single MongoDB collection to store all analy
 
 ```javascript
 {
-  "_id": ObjectId,
-  "session_id": String,
   "created_at": Date,
   "updated_at": Date,
   "file_info": {
     "file_name": String,
     "file_size": Number,
-    "file_hash": String,
-    "upload_timestamp": Date
+    "file_hash": String
   },
   "analysis_config": {
     "standard_range": String,
     "time_window": String,
     "use_time_grouping": Boolean,
-    "max_workers": Number,
-    "azure_config": {
-      "endpoint": String,
-      "deployment_name": String,
-      "api_version": String,
-      "model_used": String
-    }
+    "max_workers": Number
   },
   "analysis_status": {
     "status": String,
@@ -281,26 +272,18 @@ The Log Analyzer application uses a single MongoDB collection to store all analy
       "resolved": Boolean,
       "created_at": Date
     }
-  ],
-  "user_session": {
-    "session_id": String,
-    "user_agent": String,
-    "ip_address": String,
-    "start_time": Date,
-    "end_time": Date
-  }
+  ]
 }
 ```
 
 #### Schema Explanation
 
 ##### **Core Session Information**
-- **`session_id`**: Unique identifier for each analysis session
 - **`created_at`/`updated_at`**: Timestamps for session tracking
 - **`file_info`**: Complete file metadata including hash for duplicate prevention
 
 ##### **Analysis Configuration**
-- **`analysis_config`**: All settings used for the analysis including Azure OpenAI configuration
+- **`analysis_config`**: All settings used for the analysis
 - **`standard_range`**: Time range selection (6h, 12h, 24h)
 - **`time_window`**: Grouping window size (1H, 3H, 6H, 12H)
 - **`use_time_grouping`**: Boolean flag for performance optimization
@@ -340,15 +323,12 @@ The Log Analyzer application uses a single MongoDB collection to store all analy
 - **`error_type`**: Categorized error types (API_ERROR, PARSING_ERROR, TIMEOUT)
 - **`context`**: Function names and log entries where errors occurred
 
-##### **User Session Tracking**
-- **`user_session`**: Browser and IP information for audit trails
-- **`session_id`**: Streamlit session identifier for user experience tracking
+
 
 #### Recommended Indexes
 
 ```javascript
 // Primary performance indexes
-db.log_analysis_sessions.createIndex({ "session_id": 1 });
 db.log_analysis_sessions.createIndex({ "file_hash": 1 });
 db.log_analysis_sessions.createIndex({ "created_at": -1 });
 db.log_analysis_sessions.createIndex({ "analysis_status.status": 1 });
@@ -370,26 +350,18 @@ db.log_analysis_sessions.createIndex({ "error_logs.error_type": 1 });
 ##### **Insert New Analysis Session**
 ```javascript
 db.log_analysis_sessions.insertOne({
-  session_id: "session_123",
   created_at: new Date(),
   updated_at: new Date(),
   file_info: {
     file_name: "production.log",
     file_size: 2048000,
-    file_hash: "sha256_hash_here",
-    upload_timestamp: new Date()
+    file_hash: "sha256_hash_here"
   },
   analysis_config: {
     standard_range: "Previous 24 hours",
     time_window: "1H",
     use_time_grouping: true,
-    max_workers: 5,
-    azure_config: {
-      endpoint: "https://your-endpoint.openai.azure.com/",
-      deployment_name: "gpt4o-model",
-      api_version: "2024-07-01-preview",
-      model_used: "gpt-4o"
-    }
+    max_workers: 5
   },
   analysis_status: {
     status: "in_progress",
@@ -412,13 +384,7 @@ db.log_analysis_sessions.insertOne({
   log_entries: [],
   anomaly_distribution: { by_type: {}, by_severity: {} },
   time_series_data: [],
-  error_logs: [],
-  user_session: {
-    session_id: "streamlit_session_456",
-    user_agent: "Mozilla/5.0...",
-    ip_address: "192.168.1.100",
-    start_time: new Date()
-  }
+  error_logs: []
 });
 ```
 
