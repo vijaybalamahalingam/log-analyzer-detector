@@ -1,0 +1,9 @@
+pandas
+scikit-learn
+python-dotenv
+streamlit 
+streamlit-aggrid
+matplotlib
+seaborn
+altair
+openai

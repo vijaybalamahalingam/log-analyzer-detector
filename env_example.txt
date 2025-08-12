@@ -1,0 +1,7 @@
+# Azure OpenAI Configuration
+# Copy this content to a .env file and fill in your actual credentials
+
+AZURE_OPENAI_ENDPOINT=https://htcgpt4omodel.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt4o16kmodel
+AZURE_OPENAI_API_KEY=your_api_key_here
+AZURE_OPENAI_API_VERSION=2024-07-01-preview 
